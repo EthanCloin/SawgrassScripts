@@ -1,0 +1,13 @@
+{
+  "timeZone": "America/Los_Angeles",
+  "dependencies": {
+  },
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "sheets": {
+    "macros": [{
+      "menuName": "copying from jake",
+      "functionName": "copyingfromjake"
+    }]
+  }
+}
