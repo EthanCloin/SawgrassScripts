@@ -358,10 +358,7 @@ function onOpen() {
     .addItem("Ledger Materials by Lot", "ledgerItemsWithLot")
     .addItem("Reset Input Sheet", "resetInputSheet"))
     .addSeparator()
-    .addSubMenu(ui.createMenu("Relocating")
-    .addItem("Relocate All of Ingredient", "relocateFullQty")
-    .addItem("Relocate Some of Ingredient", "relocatePartialQty")
-    .addItem("Relocate Entire Pallet", "relocatePallet"))
+    .addItem("Relocator", "determineRelocationType")
     .addToUi(); 
 }
 /*

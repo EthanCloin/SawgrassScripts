@@ -26,14 +26,18 @@ var inputSheet = ss.getSheetByName("Relocator");
 var ledgerSheet = ss.getSheetByName("Ledger");
 var lastLedgerRow = ledgerSheet.getLastRow();
 var lastInputRow = inputSheet.getLastRow();
+var lastInputCol = inputSheet.getLastColumn();
 
 function test(){
   determineRelocationType();
 }
 
 function relocateFullQty(sourceRowNum) {
+  if (!validInputDataForFull(sourceRowNum)){
+    inputSheet.getRange(sourceRowNum, 1, 1, lastInputCol).setBackground("gray");
+    return;
+  }
 
-  inputSheet.getRange(sourceRowNum, OUTPUT+1).setValue("DETECTED FULL");
   // scan Relocator and store description, lot, source, and destination section
   
   // search Ledger for matching line item
@@ -45,7 +49,10 @@ function relocateFullQty(sourceRowNum) {
 }
 
 function relocatePartialQty(sourceRowNum){
-  inputSheet.getRange(sourceRowNum, OUTPUT+1).setValue("DETECTED PARTIAL");
+  if (!validInputDataForPartial(sourceRowNum)){
+      inputSheet.getRange(sourceRowNum, 1, 1, lastInputCol).setBackground("gray");
+      return;
+    }  
   // scan Relocator and store description, lot, source, destination, and qty
 
   // search Ledger for matching line item
@@ -72,7 +79,7 @@ function relocatePallet(sourceRowNum){
   var editedMaterials = [];
   
   // find all matching cells
-  var finder = ledgerSheet.createTextFinder(sourceSection.getValue()).matchEntireCell(true);
+  var finder = ledgerSheet.getRange(2, SECTION_I+1, lastLedgerRow).createTextFinder(sourceSection.getValue()).matchEntireCell(true);
   var foundCells = finder.findAll();
   Logger.log(foundCells);
   var foundCount = foundCells.length; 
@@ -80,6 +87,7 @@ function relocatePallet(sourceRowNum){
     editedMaterials.push("NONE FOUND");
     Logger.log(editedMaterials);
     outputCell.setValue(editedMaterials);
+    return;
   }
   
   for (var i = 0; i < foundCount; i++){
@@ -151,6 +159,68 @@ function determineRelocationType(){
 
   }
 }
+
+/*
+Ensures that the required data is present in a given row
+*/
+function validInputDataForFull(sourceRowNum) {
+  var sourceRow = inputSheet.getRange(sourceRowNum, 1, 1, lastInputCol);
+  var outputCell = sourceRow.getCell(1, OUTPUT+1);
+  var values = sourceRow.getValues();
+  var result = [];
+
+  if (values[0][DEST_SECTION] === "")  {
+    result.push("Missing Destination! ");
+  }
+  if (values[0][TARGET_DESC] === "") {
+    result.push("Missing Description! ");
+  }
+  if (values[0][TARGET_LOT] === "") {
+    result.push("Missing Lot! ");
+  }
+  
+  if (result.length != 0){
+    outputCell.setValue(result.toString());
+    return false;
+  }
+  else
+  return true;
+}
+
+/*
+Ensures that the required data is present in a given row
+*/
+function validInputDataForPartial(sourceRowNum) {
+  var sourceRow = inputSheet.getRange(sourceRowNum, 1, 1, lastInputCol);
+  var outputCell = sourceRow.getCell(1, OUTPUT+1);
+  var values = sourceRow.getValues();
+  var result = [];
+
+  if (values[0][SRC_SECTION] === "")  {
+      result.push("Missing Source! ");
+    }
+  if (values[0][DEST_SECTION] === "")  {
+    result.push("Missing Destination! ");
+  }
+  if (values[0][TARGET_DESC] === "") {
+    result.push("Missing Description! ");
+  }
+  if (values[0][TARGET_LOT] === "") {
+    result.push("Missing Lot! ");
+  }
+  if (values[0][TARGET_QTY] === "")  {
+    result.push("Missing Destination! ");
+  }
+  
+  if (result.length != 0){
+    outputCell.setValue(result.toString());
+    return false;
+  }
+  else
+  return true;
+}
+
+
 
 
 
