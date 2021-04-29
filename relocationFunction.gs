@@ -10,7 +10,7 @@ Allow the user to update the location of materials in a few ways:
         2. Data specifying a pallet (section)
         3. Data specifying an ingredient (sku, lot, qty, desired section)
 
-@ouput  1. Updated ledger entry to the desired section
+@ouput  1. N Updated ledger entries to the desired section
         2. N Updated ledger entries to the desired section
         3. Updated ledger entry with decreased quantity in original section
         AND new ledger entry with the specified relocated quantity and section
@@ -29,10 +29,9 @@ var lastLedgerCol = ledgerSheet.getLastColumn();
 var lastInputRow = inputSheet.getLastRow();
 var lastInputCol = inputSheet.getLastColumn();
 
-function test(){
-  determineRelocationType();
-}
+/*
 
+*/
 function relocateFullQty(sourceRowNum) {
   if (!validInputDataForFull(sourceRowNum)){
     inputSheet.getRange(sourceRowNum, 1, 1, lastInputCol).setBackground("gray");
@@ -80,11 +79,8 @@ function relocateFullQty(sourceRowNum) {
 
     var result = "Moved from " + prevSection.toString() + " to " + destinationSection.toString() + " on row " + matchingRow.getRow() + "\n";
     editedMaterials.push(result);
-
   }
   outputCell.setValue(editedMaterials.toString());
-    
-  
 }
 
 function relocatePartialQty(sourceRowNum){
@@ -118,8 +114,11 @@ function relocatePallet(sourceRowNum){
   var destinationSection = sourceRow.getCell(1, DEST_SECTION + 1);
   var editedMaterials = [];
   // data validation
+  if (!validInputDataForPallet(sourceRowNum)){
+    inputSheet.getRange(sourceRowNum, 1, 1, lastInputCol).setBackground("gray");
+    return;
+  }
   
-
   // find all matching cells
   var finder = ledgerSheet.getRange(2, SECTION_I+1, lastLedgerRow).createTextFinder(sourceSection.getValue()).matchEntireCell(true);
   var foundCells = finder.findAll();
@@ -146,31 +145,7 @@ function relocatePallet(sourceRowNum){
     }
 
   }
-  
   outputCell.setValue("Moved " + editedMaterials.length + " items: " + editedMaterials.toString());
-  // // search Ledger for all line items with source section
-  // for (var row = lastLedgerRow; row > 0; row--){
-  //   // check section value
-  //   currentSectionCell = ledgerSheet.getRange(row, SECTION_I + 1);
-  //   currentSection = currentSectionCell.getValue();
-
-  //   if (currentSection === sourceSection){
-  //     // update section to destination
-  //     currentSectionCell.setValue(destinationSection);
-
-  //     // add row number and desc to 
-  //     var rowNum = currentSectionCell.getRow();
-  //     var description = ledgerSheet.getRange(row, DESC_I+1).getValue();
-  //     var edited = [rowNum, description];
-  //     editedMaterials.push(edited);
-  //   }
-
-  // }
-
-  // update to destination section
-
-  // return description and rows updated for easy confirmation
-  
 }
 
 /*
@@ -260,9 +235,33 @@ function validInputDataForPartial(sourceRowNum) {
     result.push("Missing Lot! ");
   }
   if (values[0][TARGET_QTY] === "")  {
-    result.push("Missing Destination! ");
+    result.push("Missing Quantity! ");
   }
   
+  if (result.length != 0){
+    outputCell.setValue(result.toString());
+    return false;
+  }
+  else
+  return true;
+}
+
+/*
+Ensures that the required data is present in a given row
+*/
+function validInputDataForPallet(sourceRowNum) {
+  var sourceRow = inputSheet.getRange(sourceRowNum, 1, 1, lastInputCol);
+  var outputCell = sourceRow.getCell(1, OUTPUT+1);
+  var values = sourceRow.getValues();
+  var result = [];
+
+  if (values[0][SRC_SECTION] === "")  {
+      result.push("Missing Source! ");
+    }
+  if (values[0][DEST_SECTION] === "")  {
+    result.push("Missing Destination! ");
+  }
+ 
   if (result.length != 0){
     outputCell.setValue(result.toString());
     return false;
