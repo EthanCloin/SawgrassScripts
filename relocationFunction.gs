@@ -25,6 +25,7 @@ var ui = SpreadsheetApp.getUi();
 var inputSheet = ss.getSheetByName("Relocator");
 var ledgerSheet = ss.getSheetByName("Ledger");
 var lastLedgerRow = ledgerSheet.getLastRow();
+var lastLedgerCol = ledgerSheet.getLastColumn();
 var lastInputRow = inputSheet.getLastRow();
 var lastInputCol = inputSheet.getLastColumn();
 
@@ -39,12 +40,50 @@ function relocateFullQty(sourceRowNum) {
   }
 
   // scan Relocator and store description, lot, source, and destination section
+  var sourceRow = inputSheet.getRange(sourceRowNum, SRC_SECTION+1, 1, OUTPUT+1);
+  var outputCell = sourceRow.getCell(1, OUTPUT+1);
+  var targetDescription = sourceRow.getCell(1, TARGET_DESC + 1).getValue();
+  var targetLot = sourceRow.getCell(1, TARGET_LOT + 1).getValue();
+  var sourceSection = sourceRow.getCell(1, SRC_SECTION + 1).getValue();
+  var destinationSection = sourceRow.getCell(1, DEST_SECTION + 1).getValue();
+  var editedMaterials = [];
   
-  // search Ledger for matching line item
+  // search Ledger for matching lot
+  var finder =  ledgerSheet.getRange(2, LOT_I+1, lastLedgerRow, 1)
+                .createTextFinder(targetLot)
+                .matchEntireCell(true)
+                
+  var matchingLotsRange = finder.findAll();
+  var foundCount = matchingLotsRange.length;
 
-  // update Section value
+  for (var i = 0; i < foundCount; i++){
+    // get the whole row
+    var currentCell = matchingLotsRange[i];
+    var matchingRow = ledgerSheet.getRange(currentCell.getRow, 1, 1, lastLedgerCol);
 
-  // mark as complete and show edited row number for easy confirmation
+    // check row for positive qty
+    var currentQty = matchingRow.getCell(1, QTY_I+1).getValue();
+    if (currentQty <= 0){continue;}
+
+    // check row for matching desc
+    var currentDesc = matchingRow.getCell(1, DESC_I+1).getValue();
+    if (currentDesc != targetDescription){continue;}
+
+    // check row for matching source
+    var sectionCell = matchingRow.getCell(1, SECTION_I+1);
+    var currentSection = sectionCell.getValue();
+    if (currentSection != sourceSection){continue;}
+    var prevSection = currentSection;
+
+    // update Section value
+    sectionCell.setValue(destinationSection);
+
+    var result = "Moved from " + prevSection.toString() + " to " + destinationSection.toString() + "on row " + matchingRow.getRow() + "\n";
+    editedMaterials.push(result);
+
+  }
+  outputCell.setValue(editedMaterials.toString());
+    
   
 }
 
