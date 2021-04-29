@@ -72,35 +72,78 @@ function relocateFullQty(sourceRowNum) {
     var sectionCell = matchingRow.getCell(1, SECTION_I+1);
     var currentSection = sectionCell.getValue();
     if (sourceSection != "" && currentSection != sourceSection){continue;}
-    var prevSection = currentSection;
 
     // update Section value
     sectionCell.setValue(destinationSection);
 
-    var result = "Moved from " + prevSection.toString() + " to " + destinationSection.toString() + " on row " + matchingRow.getRow() + "\n";
+    var result = "Moved from " + currentSection.toString() + " to " + destinationSection.toString() + " on row " + matchingRow.getRow() + "\n";
     editedMaterials.push(result);
   }
   outputCell.setValue(editedMaterials.toString());
 }
 
+/*
+
+*/
 function relocatePartialQty(sourceRowNum){
   if (!validInputDataForPartial(sourceRowNum)){
       inputSheet.getRange(sourceRowNum, 1, 1, lastInputCol).setBackground("gray");
       return;
     }  
   // scan Relocator and store description, lot, source, destination, and qty
+  var sourceRow = inputSheet.getRange(sourceRowNum, SRC_SECTION+1, 1, OUTPUT+1);
+  var outputCell = sourceRow.getCell(1, OUTPUT+1);
+  var targetDescription = sourceRow.getCell(1, TARGET_DESC + 1).getValue();
+  var targetLot = sourceRow.getCell(1, TARGET_LOT + 1).getValue();
+  var sourceSection = sourceRow.getCell(1, SRC_SECTION + 1).getValue();
+  var destinationSection = sourceRow.getCell(1, DEST_SECTION + 1).getValue();
+  var targetQty = sourceRow.getCell(1, TARGET_QTY+1).getValue();
+  var editedMaterials = [];
 
-  // search Ledger for matching line item
+  // search Ledger for matching line items
+  var finder =  ledgerSheet.getRange(2, LOT_I+1, lastLedgerRow, 1)
+                  .createTextFinder(targetLot)
+                  .matchEntireCell(true)
+  var matchingLotsRange = finder.findAll();
+  var foundCount = matchingLotsRange.length;
+
+  for (var i = 0; i < foundCount; i++){
+    // get the whole row
+    var currentCell = matchingLotsRange[i];
+    var matchingRow = ledgerSheet.getRange(currentCell.getRow(), 1, 1, lastLedgerCol);
+
+    // check description
+    var currentDesc = matchingRow.getCell(1, DESC_I+1).getValue();
+    if (currentDesc != targetDescription){continue;}
+
+    // check section
+    var sectionCell = matchingRow.getCell(1, SECTION_I+1);
+    var currentSection = sectionCell.getValue();
+    if (sourceSection != "" && currentSection != sourceSection){continue;}
+    var prevSection = currentSection;
+
+    // check that qty > qty to remove
+    var currentQty = matchingRow.getCell(1, QTY_I+1).getValue();
+    if (currentQty <= targetQty){Logger.log("notenough");continue;}
+
 
   // duplicate matching line
+    ledgerSheet.insertRowAfter(matchingRow.getRow());
+    var newRow = ledgerSheet.getRange(matchingRow.getRow() + 1, 1, 1, lastLedgerCol); 
+    matchingRow.copyTo(newRow);
 
   // update duplicate to the qty and section from Relocator
+    newRow.getCell(1, SECTION_I + 1).setValue(destinationSection);
+    newRow.getCell(1, QTY_I+1).setValue(targetQty);
 
   // update matching line by subtracting qty from Relocator
+    matchingRow.getCell(1, QTY_I+1).setValue(currentQty - targetQty);
 
   // mark as complete and show edited row number for easy confirmation
+    var result = "Moved " + targetQty + "of " + targetDescription +  " on row " + matchingRow.getRow() + " from " + currentSection + " to " + destinationSection +"\n"
+    editedMaterials.push(result);
 
-
+ }
 }
 /*
 trying to brainstorm a better way than searching whole sheet because thattt is a long process
@@ -256,7 +299,13 @@ function validInputDataForPallet(sourceRowNum) {
   var result = [];
 
   if (values[0][SRC_SECTION] === "")  {
-      result.push("Missing Source! ");
+    // prompt whether user is okay with changing values regardless of source section
+    var response = ui.alert('The source section is blank! Are you sure you want to move this material without considering current location?', ui.ButtonSet.YES_NO);
+    if (response == ui.Button.YES ){
+      //continue
+    }else if (response == ui.Button.NO){
+      return false;
+    }
     }
   if (values[0][DEST_SECTION] === "")  {
     result.push("Missing Destination! ");
