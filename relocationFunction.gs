@@ -59,7 +59,7 @@ function relocateFullQty(sourceRowNum) {
   for (var i = 0; i < foundCount; i++){
     // get the whole row
     var currentCell = matchingLotsRange[i];
-    var matchingRow = ledgerSheet.getRange(currentCell.getRow, 1, 1, lastLedgerCol);
+    var matchingRow = ledgerSheet.getRange(currentCell.getRow(), 1, 1, lastLedgerCol);
 
     // check row for positive qty
     var currentQty = matchingRow.getCell(1, QTY_I+1).getValue();
@@ -72,13 +72,13 @@ function relocateFullQty(sourceRowNum) {
     // check row for matching source
     var sectionCell = matchingRow.getCell(1, SECTION_I+1);
     var currentSection = sectionCell.getValue();
-    if (currentSection != sourceSection){continue;}
+    if (sourceSection != "" && currentSection != sourceSection){continue;}
     var prevSection = currentSection;
 
     // update Section value
     sectionCell.setValue(destinationSection);
 
-    var result = "Moved from " + prevSection.toString() + " to " + destinationSection.toString() + "on row " + matchingRow.getRow() + "\n";
+    var result = "Moved from " + prevSection.toString() + " to " + destinationSection.toString() + " on row " + matchingRow.getRow() + "\n";
     editedMaterials.push(result);
 
   }
@@ -110,13 +110,16 @@ function relocatePartialQty(sourceRowNum){
 trying to brainstorm a better way than searching whole sheet because thattt is a long process
 */
 function relocatePallet(sourceRowNum){
+  
   // scan Relocator and store source and destination section
   var sourceRow = inputSheet.getRange(sourceRowNum, SRC_SECTION+1, 1, OUTPUT+1);
   var outputCell = sourceRow.getCell(1, OUTPUT+1);
   var sourceSection = sourceRow.getCell(1, SRC_SECTION + 1);
   var destinationSection = sourceRow.getCell(1, DEST_SECTION + 1);
   var editedMaterials = [];
+  // data validation
   
+
   // find all matching cells
   var finder = ledgerSheet.getRange(2, SECTION_I+1, lastLedgerRow).createTextFinder(sourceSection.getValue()).matchEntireCell(true);
   var foundCells = finder.findAll();
@@ -217,6 +220,15 @@ function validInputDataForFull(sourceRowNum) {
   if (values[0][TARGET_LOT] === "") {
     result.push("Missing Lot! ");
   }
+  if (values[0][SRC_SECTION] === ""){
+    // prompt whether user is okay with changing values regardless of source section
+    var response = ui.alert('The source section is blank! Are you sure you want to move all materials, regardless of current location?', ui.ButtonSet.YES_NO);
+    if (response == ui.Button.YES ){
+      //continue
+    }else if (response == ui.Button.NO){
+      return false;
+    }
+  }
   
   if (result.length != 0){
     outputCell.setValue(result.toString());
@@ -259,7 +271,12 @@ function validInputDataForPartial(sourceRowNum) {
   return true;
 }
 
-
-
-
+/*
+resets input sheet to blank
+*/
+function resetInputSheet(){
+  var target = inputSheet.getRange(2, 1, inputSheet.getLastRow(), inputSheet.getLastColumn());
+  target.clearContent();
+  target.setBackground('white');
+}
 
