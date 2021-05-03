@@ -15,31 +15,18 @@ Allow the user to update the location of materials in a few ways:
         3. Updated ledger entry with decreased quantity in original section
         AND new ledger entry with the specified relocated quantity and section
 */
-// Column Constants (index, so add 1 for row use)
-const SRC_SECTION = 0, DEST_SECTION = 1, TARGET_DESC = 2, TARGET_LOT = 3, TARGET_QTY = 4, 
-      RELOC_TYPE = 5, OUTPUT = 6;
-
-// Global References
-var ss = SpreadsheetApp.getActiveSpreadsheet();
-var ui = SpreadsheetApp.getUi();
-var inputSheet = ss.getSheetByName("Relocator");
-var ledgerSheet = ss.getSheetByName("Ledger");
-var lastLedgerRow = ledgerSheet.getLastRow();
-var lastLedgerCol = ledgerSheet.getLastColumn();
-var lastInputRow = inputSheet.getLastRow();
-var lastInputCol = inputSheet.getLastColumn();
 
 /*
 
 */
 function relocateFullQty(sourceRowNum) {
   if (!validInputDataForFull(sourceRowNum)){
-    inputSheet.getRange(sourceRowNum, 1, 1, lastInputCol).setBackground("gray");
+    relocatorSheet.getRange(sourceRowNum, 1, 1, lastRelocatorCol).setBackground("gray");
     return;
   }
 
   // scan Relocator and store description, lot, source, and destination section
-  var sourceRow = inputSheet.getRange(sourceRowNum, SRC_SECTION+1, 1, OUTPUT+1);
+  var sourceRow = relocatorSheet.getRange(sourceRowNum, SRC_SECTION+1, 1, OUTPUT+1);
   var outputCell = sourceRow.getCell(1, OUTPUT+1);
   var targetDescription = sourceRow.getCell(1, TARGET_DESC + 1).getValue();
   var targetLot = sourceRow.getCell(1, TARGET_LOT + 1).getValue();
@@ -88,11 +75,11 @@ need to run tests
 */
 function relocatePartialQty(sourceRowNum){
   if (!validInputDataForPartial(sourceRowNum)){
-      inputSheet.getRange(sourceRowNum, 1, 1, lastInputCol).setBackground("gray");
+      relocatorSheet.getRange(sourceRowNum, 1, 1, lastRelocatorCol).setBackground("gray");
       return;
     }  
   // scan Relocator and store description, lot, source, destination, and qty
-  var sourceRow = inputSheet.getRange(sourceRowNum, SRC_SECTION+1, 1, OUTPUT+1);
+  var sourceRow = relocatorSheet.getRange(sourceRowNum, SRC_SECTION+1, 1, OUTPUT+1);
   var outputCell = sourceRow.getCell(1, OUTPUT+1);
   var targetDescription = sourceRow.getCell(1, TARGET_DESC + 1).getValue();
   var targetLot = sourceRow.getCell(1, TARGET_LOT + 1).getValue();
@@ -173,14 +160,14 @@ trying to brainstorm a better way than searching whole sheet because thattt is a
 */
 function relocatePallet(sourceRowNum){
   // scan Relocator and store source and destination section
-  var sourceRow = inputSheet.getRange(sourceRowNum, SRC_SECTION+1, 1, OUTPUT+1);
+  var sourceRow = relocatorSheet.getRange(sourceRowNum, SRC_SECTION+1, 1, OUTPUT+1);
   var outputCell = sourceRow.getCell(1, OUTPUT+1);
   var sourceSection = sourceRow.getCell(1, SRC_SECTION + 1);
   var destinationSection = sourceRow.getCell(1, DEST_SECTION + 1);
   var editedMaterials = [];
   // data validation
   if (!validInputDataForPallet(sourceRowNum)){
-    inputSheet.getRange(sourceRowNum, 1, 1, lastInputCol).setBackground("gray");
+    relocatorSheet.getRange(sourceRowNum, 1, 1, lastRelocatorCol).setBackground("gray");
     return;
   }
   
@@ -219,8 +206,8 @@ Partial
 Pallet
 */
 function determineRelocationType(){
-  for (var i = 2; i <= lastInputRow; i++) {
-    var typeCell = inputSheet.getRange(i, RELOC_TYPE + 1);
+  for (var i = 2; i <= lastRelocatorRow; i++) {
+    var typeCell = relocatorSheet.getRange(i, RELOC_TYPE + 1);
     relocationType = typeCell.getValue();
     Logger.log("Relocation type: " + relocationType);
 
@@ -245,7 +232,7 @@ function determineRelocationType(){
 Ensures that the required data is present in a given row
 */
 function validInputDataForFull(sourceRowNum) {
-  var sourceRow = inputSheet.getRange(sourceRowNum, 1, 1, lastInputCol);
+  var sourceRow = relocatorSheet.getRange(sourceRowNum, 1, 1, lastRelocatorCol);
   var outputCell = sourceRow.getCell(1, OUTPUT+1);
   var values = sourceRow.getValues();
   var result = [];
@@ -281,7 +268,7 @@ function validInputDataForFull(sourceRowNum) {
 Ensures that the required data is present in a given row
 */
 function validInputDataForPartial(sourceRowNum) {
-  var sourceRow = inputSheet.getRange(sourceRowNum, 1, 1, lastInputCol);
+  var sourceRow = relocatorSheet.getRange(sourceRowNum, 1, 1, lastRelocatorCol);
   var outputCell = sourceRow.getCell(1, OUTPUT+1);
   var values = sourceRow.getValues();
   var result = [];
@@ -301,7 +288,6 @@ function validInputDataForPartial(sourceRowNum) {
   if (values[0][TARGET_QTY] === "")  {
     result.push("Missing Quantity! ");
   }
-  
   if (result.length != 0){
     outputCell.setValue(result.toString());
     return false;
@@ -314,7 +300,7 @@ function validInputDataForPartial(sourceRowNum) {
 Ensures that the required data is present in a given row
 */
 function validInputDataForPallet(sourceRowNum) {
-  var sourceRow = inputSheet.getRange(sourceRowNum, 1, 1, lastInputCol);
+  var sourceRow = relocatorSheet.getRange(sourceRowNum, 1, 1, lastRelocatorCol);
   var outputCell = sourceRow.getCell(1, OUTPUT+1);
   var values = sourceRow.getValues();
   var result = [];
@@ -338,14 +324,5 @@ function validInputDataForPallet(sourceRowNum) {
   }
   else
   return true;
-}
-
-/*
-resets input sheet to blank
-*/
-function resetInputSheet(){
-  var target = inputSheet.getRange(2, 1, inputSheet.getLastRow(), inputSheet.getLastColumn());
-  target.clearContent();
-  target.setBackground('white');
 }
 

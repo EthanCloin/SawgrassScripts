@@ -37,21 +37,6 @@ Usage:
   The function "resetInputSheet" clears the contents of inputSheet
 */
 
-//Constants to represent what columns are which index values
-const DATE_I = 0, SKU_I = 1, DESC_I = 2, COA_I = 3, EXP_I = 4, QTY_I = 5, PACK_I = 6, SECTION_I = 7, LOT_I = 8, 
-    VENDOR_I = 9, PRICE_I = 10, POJOB_I = 11, COMMENT_I = 12, COMPONENT_I = 13, CHECK_I = 14;
-
-var ss = SpreadsheetApp.getActiveSpreadsheet();
-  
-var sheet = ss.getSheetByName("Ledger"); // ledger target
-var input = ss.getSheetByName("inputTable"); // ledger input
-var ui = SpreadsheetApp.getUi();
-
-var lastRow = sheet.getLastRow(); // final ledger entry
-var lastCol = sheet.getLastColumn(); // final ledger column
-var lastInputRow = input.getLastRow(); // final input entry
-var lastInputCol = input.getLastColumn(); // final input column
-
 /*
 @author Ethan Cloin
 @version 2021-02-15
@@ -80,131 +65,69 @@ locating the JobNumber in the Allocation Pivot in Master Inventory.
 */
 function ledgerItemsWithLot(){
 
-//check for actual input
-if (lastInputRow === 1) {
-  
-  ui.alert("Provide values that you want to ledger!")
-  return;
-}
-
-//check for already highlighted rows
-if (input.getActiveRange().getBackground() != 'white' && input.getActiveRange().getBackground() != '#ffffff'){
-  //prompt user for approval
-  var response = ui.alert('The input sheet is not reset! Are you sure you want to continue?', ui.ButtonSet.YES_NO);
-  if (response == ui.Button.YES ){
-    //continue
-  }else if (response == ui.Button.NO){
+  // confirm data is input correctly
+  if (!validInputSheet()){
     return;
   }
-}
 
-  var targetRange = []; // holds range on inputSheet, each index is a Range representing a single row
-  var lastTargetIndex; // denotes end of targetRange
-  
-  //fill targetRange with values from input sheet
-  for (var i = 2; i <= lastInputRow; i++){
-    index = i - 2; // have to offset by 2 thanks to sheet syntax conflict with JS array syntax
-    
-    targetRange[index] = input.getRange(i, 1, 1, lastInputCol);
-    lastTargetIndex = index; // unknown error when using targetRange.length, this index solves
+  var errorRowNumbers = [];
+
+  for (var row = 2; row <= lastAssistantRow; row++){
+    // read data from inputSheet
+    var currentInputRow = assistantSheet.getRange(row, 1, 1, lastAssistantCol);
+    var currentInputLot = currentInputRow.getCell(1, INPUT_LOT).getValue();
+    var currentInputDesc = currentInputRow.getCell(1, INPUT_DESC).getValue();
+    var currentInputQty = -1 * Math.abs(currentInputRow.getCell(1, INPUT_QTY).getValue());
+    var currentInputJob = currentInputRow.getCell(1, INPUT_JOB).getValue();
+    var currentInputComment = currentInputRow.getCell(1, INPUT_COMMENT).getValue();
+
+    // create a TextFinder for the current Lot
+    Logger.log(currentInputLot);
+    var finder = ledgerSheet.getRange(2, LOT_I+1, lastLedgerRow, 1).createTextFinder(currentInputLot).matchEntireCell(true);
+    var matchingLot = finder.findNext();
+    Logger.log(matchingLot);
+    // check for no lot found
+    if (matchingLot === null){
+          errorRowNumbers.push(row);
+          continue;
+    }
+
+    while (true) {
+      // get row containing matchingLot
+      var rowNumber = matchingLot.getRow();
+      var currentLedgerRow = ledgerSheet.getRange(rowNumber, 1, 1, lastLedgerCol);
+
+      // check for matching Description
+      var currentLedgerDesc = currentLedgerRow.getCell(1, DESC_I+1).getValue();
+      if (currentLedgerDesc === currentInputDesc){
+        // create new ledger entry
+        ledgerSheet.insertRowAfter(rowNumber);
+        var newLedgerEntry = ledgerSheet.getRange(rowNumber+1, 1, 1, lastLedgerCol);
+        currentLedgerRow.copyTo(newLedgerEntry);
+        // update fields of new entry per input sheet
+        newLedgerEntry.getCell(1, DATE_I+1).setValue(new Date());
+        newLedgerEntry.getCell(1, QTY_I+1).setValue(currentInputQty);
+        newLedgerEntry.getCell(1, POJOB_I+1).setValue(currentInputJob);
+        newLedgerEntry.getCell(1, COMMENT_I+1).setValue(currentInputComment);
+        newLedgerEntry.getCell(1, CHECK_I+1).check();
+        break;
+      }
+      else {
+        matchingLot = finder.findNext();
+        // no valid match found
+        if (matchingLot === null){
+          errorRowNumbers.push(row);
+          break;
+        }
+      }
+    }
   }
-  var replacementRow; // holds the data for new ledger entry 
-  var curLot; 
-  var curDesc;
-  
-  for (var i = 2; i <= lastRow; i++){
-
-    //end if targetRange is depleted
-    if (lastTargetIndex < 0){
-      break;
-    }
-    //check lot of current row
-    curLot = sheet.getRange(i, LOT_I+1).getValue();
-
-    //check input array for that lot
-    for (var j = 0; j <= lastTargetIndex; j++){
-      //variables for inputTable values
-     var ledgerLot = targetRange[j].getValues()[0][0];
-     var ledgerDesc = targetRange[j].getValues()[0][1];
-     var ledgerQty = Math.abs(targetRange[j].getValues()[0][2]);
-     var ledgerJob = targetRange[j].getValues()[0][3];
-     var ledgerComment = targetRange[j].getValues()[0][4];
-      
-     //if found lot
-     if (ledgerLot == curLot){
-       
-       //fetch and compare descriptions
-       curDesc = sheet.getRange(i, DESC_I+1).getValue();
-      
-      //if matching lot && matching description
-       if (ledgerDesc == curDesc){
-  
-        
-        //proceed with ledgering
-
-        //insert blank row in Ledger
-        sheet.insertRowAfter(i);
-      
-        //update replacementRow to duplicate of current row
-        replacementRow = sheet.getRange(i, 1, 1, 15).getValues();
-        
-        //update replacementRow to desired ledger quantity
-        replacementRow[0][QTY_I] = ledgerQty * -1; //switch sign to negative
-
-        //update replacementRow to desired comment
-        replacementRow[0][COMMENT_I] = ledgerComment;
-
-        //update replacementRow to desired JobNumber
-        replacementRow[0][POJOB_I] = ledgerJob;
-
-        //update replacement Row to current date
-        replacementRow[0][DATE_I] = new Date();
-
-        //insert updated row aka complete ledgering
-        sheet.getRange(i+1, 1, replacementRow.length, 15).setValues(replacementRow);
-
-        //remove row from targetRange
-        targetRange.splice(j, 1);
-
-        //decrement loop boundaries to prevent searching out of bounds
-        j--;
-        lastTargetIndex--;//using .length breaks it...idk why
-
-       }
-     }// end if matching lot
-    }// end loop through input
-  }// end loop through Ledger sheet  
-  
-// loop through targetRange and grab remaining lot numbers to store in array
-var remainingLots = [];
-var isIncomplete = false;
-for (var i = 0; i < targetRange.length; i++){
-  remainingLots[i] = targetRange[i].getValue();
+  highlightMissedRows(errorRowNumbers);
 }
 
-// loop through inputSheet and check for lots in remainingLots
-for (var i = 2; i <= lastInputRow; i++){
-    var current = input.getRange(i, 1, 1, 1);
+  /*  ABOVE THIS LINE IS REFACTORED CODE 
+      BELOW THIS LINE IS OLD AND SLOW */
 
-    if (remainingLots.includes(current.getValue())){
-      input.getRange(i, 1, 1, lastInputCol).setBackground('red');
-      isIncomplete = true;
-    }
-    else{
-      input.getRange(i, 1, 1, lastInputCol).setBackground('green');
-    }
-}
-
-// announce whether entries failed to ledger
-if (isIncomplete){
-  var message = "UNLEDGERED ITEMS!\nCheck inputSheet for details";
-    ui.alert(message);
-}else{
-  var message = "SUCCESSFULLY LEDGERED BY LOT!\nReset inputSheet for next user!";
-    ui.alert(message);
-}
-
-}
 /*
 @author Ethan Cloin
 @version 2021-03-12
@@ -229,14 +152,13 @@ locating the JobNumber in the Allocation Pivot in Master Inventory.
 function ledgerItemsWithSKU(){
 
 //check for actual input
-if (lastInputRow === 1) {
-  
+if (lastAssistantRow === 1) {
   ui.alert("Provide values that you want to ledger!")
   return;
 }
 
 //check for already highlighted rows
-if (input.getActiveRange().getBackground() != 'white' && input.getActiveRange().getBackground() != '#ffffff'){
+if (assistantSheet.getActiveRange().getBackground() != 'white' && assistantSheet.getActiveRange().getBackground() != '#ffffff'){
   //prompt user for approval
   var response = ui.alert('The input sheet is not reset! Are you sure you want to continue?', ui.ButtonSet.YES_NO);
   if (response == ui.Button.YES ){
@@ -250,10 +172,10 @@ if (input.getActiveRange().getBackground() != 'white' && input.getActiveRange().
   var lastTargetIndex; // denotes end of targetRange
   
   //fill targetRange with values from input sheet
-  for (var i = 2; i <= lastInputRow; i++){
+  for (var i = 2; i <= lastAssistantRow; i++){
     index = i - 2; // have to offset by 2 thanks to sheet syntax conflict with JS array syntax
     
-    targetRange[index] = input.getRange(i, 1, 1, lastInputCol);
+    targetRange[index] = assistantSheet.getRange(i, 1, 1, lastAssistantCol);
     lastTargetIndex = index; // mysterious error when using targetRange.length, this index solves
   }
   var replacementRow; // holds the data for new ledger entry 
@@ -261,14 +183,14 @@ if (input.getActiveRange().getBackground() != 'white' && input.getActiveRange().
   var curDesc;
   
   //loop through ledger
-  for (var i = 2; i <= lastRow; i++){
+  for (var i = 2; i <= lastLedgerRow; i++){
 
     //end if targetRange is depleted
     if (lastTargetIndex < 0){
       break;
     }
     //check description of current row
-    curDesc = sheet.getRange(i, DESC_I+1).getValue();
+    curDesc = ledgerSheet.getRange(i, DESC_I+1).getValue();
     
     //check input array for that description
     for (var j = 0; j <= lastTargetIndex; j++){
@@ -283,10 +205,10 @@ if (input.getActiveRange().getBackground() != 'white' && input.getActiveRange().
      if (ledgerDesc === curDesc){
       //proceed with ledgering
         //insert blank row in Ledger
-        sheet.insertRowAfter(i);
+        ledgerSheet.insertRowAfter(i);
       
         //update replacementRow to duplicate of current row
-        replacementRow = sheet.getRange(i, 1, 1, 15).getValues();
+        replacementRow = ledgerSheet.getRange(i, 1, 1, 15).getValues();
         
         //update replacementRow to desired ledger quantity
         replacementRow[0][QTY_I] = ledgerQty * -1; //switch sign to negative
@@ -304,7 +226,7 @@ if (input.getActiveRange().getBackground() != 'white' && input.getActiveRange().
         replacementRow[0][LOT_I] = "";
 
         //insert updated row aka complete ledgering
-        sheet.getRange(i+1, 1, replacementRow.length, 15).setValues(replacementRow);
+        ledgerSheet.getRange(i+1, 1, replacementRow.length, 15).setValues(replacementRow);
 
         //remove row from targetRange
         targetRange.splice(j, 1);
@@ -323,14 +245,14 @@ for (var i = 0; i < targetRange.length; i++){
 }
 
 // loop through inputSheet and check for descriptions in remainingDesc
-for (var i = 2; i <= lastInputRow; i++){
-    var current = input.getRange(i, 2, 1, 1); 
+for (var i = 2; i <= lastAssistantRow; i++){
+    var current = assistantSheet.getRange(i, 2, 1, 1); 
     if (remainingDesc.includes(current.getValue())){
-      input.getRange(i, 1, 1, lastInputCol).setBackground('red');
+      assistantSheet.getRange(i, 1, 1, lastAssistantCol).setBackground('red');
       isIncomplete = true;
     }
     else{
-      input.getRange(i, 1, 1, lastInputCol).setBackground('green');
+      assistantSheet.getRange(i, 1, 1, lastAssistantCol).setBackground('green');
     }
 }
 
@@ -365,7 +287,58 @@ function onOpen() {
 resets input sheet to blank
 */
 function resetInputSheet(){
-  var target = input.getRange(2, 1, input.getLastRow(), input.getLastColumn());
+  var target = assistantSheet.getRange(2, 1, assistantSheet.getLastRow(), assistantSheet.getLastColumn());
   target.setBackground('white');
   target.clearContent();
+}
+
+/*
+returns false if there is no data or a highlight in active range
+*/
+function validInputSheet(){
+  //check for existing input
+  if (lastAssistantRow === 1) {
+    
+    ui.alert("Provide values that you want to ledger!")
+    return false;
+  }
+
+  //check for highlighted rows
+  if (assistantSheet.getActiveRange().getBackground() != 'white' && assistantSheet.getActiveRange().getBackground() != '#ffffff'){
+    //prompt user for approval
+    var response = ui.alert('The input sheet is not reset! Are you sure you want to continue?', ui.ButtonSet.YES_NO);
+
+    if (response == ui.Button.YES ){// ignore highlights
+      return true;
+    }
+    else if (response == ui.Button.NO){// cancel script
+      return false;
+    }
+  }
+  return true;
+}
+
+/*
+highlight the error rows
+*/
+function highlightMissedRows(errorRowNumbers){
+  var missingAny = false;
+
+  for (var row = 2; row <= lastAssistantRow; row++){
+    if (errorRowNumbers.includes(row)){
+      assistantSheet.getRange(row, 1, 1, lastAssistantCol).setBackground("crimson");
+      missingAny = true;
+      continue;
+    }
+    assistantSheet.getRange(row, 1, 1, lastAssistantCol).setBackground("mediumspringgreen");
+  }
+
+  if (missingAny){
+    var message = "UNLEDGERED ITEMS!\nCheck ledgeringAssistant for details.";
+    ui.alert(message);
+  }
+  else{
+    var message = "SUCCESSFULLY LEDGERED!\nReset ledgeringAssistant for next use.";
+    ui.alert(message);
+  }
 }
