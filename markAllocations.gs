@@ -14,21 +14,31 @@ var ui = SpreadsheetApp.getUi();
 function detectAllocatedMaterials() {
   var boxesChecked = 0;
   // check for empty lot field
-  for (var row = 2; i <= lastRow; i++){
+  for (var row = 2; row <= lastRow; row++){
     
     var lotCell = ledger.getRange(row, LOT_I+1);
     if (lotCell.isBlank()){
+      Logger.log("is blank");
+      // check for negative qty
+      var currentQty = ledger.getRange(row, QTY_I+1).getValue();
+      if (currentQty < 0){
+        Logger.log("is negative");
       // check PO/Job/Order for "*(C/L)****"
       var jobNumber = ledger.getRange(row, POJOB_I+1).getValue();
       if (jobNumber.toString().length === 6){
+        Logger.log("length is 6");
         if (jobNumber[1] === 'C' || jobNumber[1] === 'L'){
+          Logger.log("second entry is L or C");
           // check box
           ledger.getRange(row, CHECK_I+1).check();
           boxesChecked++;
+
         }
       }
     }
-    continue;
+  }
+  Logger.log("skip");
+  continue;
   }
   ui.alert("Marked " + boxesChecked + " items as Allocated. Check Allocation Pivot for specifics.");
 }
