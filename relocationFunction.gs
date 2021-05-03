@@ -47,6 +47,7 @@ function relocateFullQty(sourceRowNum) {
   var destinationSection = sourceRow.getCell(1, DEST_SECTION + 1).getValue();
   var editedMaterials = [];
   
+  
   // search Ledger for matching lot
   var finder =  ledgerSheet.getRange(2, LOT_I+1, lastLedgerRow, 1)
                 .createTextFinder(targetLot)
@@ -83,7 +84,7 @@ function relocateFullQty(sourceRowNum) {
 }
 
 /*
-
+need to run tests
 */
 function relocatePartialQty(sourceRowNum){
   if (!validInputDataForPartial(sourceRowNum)){
@@ -97,8 +98,9 @@ function relocatePartialQty(sourceRowNum){
   var targetLot = sourceRow.getCell(1, TARGET_LOT + 1).getValue();
   var sourceSection = sourceRow.getCell(1, SRC_SECTION + 1).getValue();
   var destinationSection = sourceRow.getCell(1, DEST_SECTION + 1).getValue();
-  var targetQty = sourceRow.getCell(1, TARGET_QTY+1).getValue();
+  var targetQty = Math.abs(sourceRow.getCell(1, TARGET_QTY+1).getValue());
   var editedMaterials = [];
+  var possibleErrors = [];
 
   // search Ledger for matching line items
   var finder =  ledgerSheet.getRange(2, LOT_I+1, lastLedgerRow, 1)
@@ -114,17 +116,26 @@ function relocatePartialQty(sourceRowNum){
 
     // check description
     var currentDesc = matchingRow.getCell(1, DESC_I+1).getValue();
-    if (currentDesc != targetDescription){continue;}
+    if (currentDesc != targetDescription){
+      possibleErrors.push("wrong desc on row " + matchingRow.getRow());
+      continue;
+      }
 
     // check section
     var sectionCell = matchingRow.getCell(1, SECTION_I+1);
     var currentSection = sectionCell.getValue();
-    if (sourceSection != "" && currentSection != sourceSection){continue;}
+    if (sourceSection != "" && currentSection != sourceSection){
+      possibleErrors.push("wrong section on row " + matchingRow.getRow());
+      continue;
+      }
     var prevSection = currentSection;
 
     // check that qty > qty to remove
     var currentQty = matchingRow.getCell(1, QTY_I+1).getValue();
-    if (currentQty <= targetQty){Logger.log("notenough");continue;}
+    if (currentQty <= targetQty){
+      possibleErrors.push("not enough available qty on row " + matchingRow.getRow());
+      continue;
+      }
 
 
   // duplicate matching line
@@ -138,18 +149,29 @@ function relocatePartialQty(sourceRowNum){
 
   // update matching line by subtracting qty from Relocator
     matchingRow.getCell(1, QTY_I+1).setValue(currentQty - targetQty);
+    var currentUnit = matchingRow.getCell(1, PACK_I+1).getValue();
 
   // mark as complete and show edited row number for easy confirmation
-    var result = "Moved " + targetQty + "of " + targetDescription +  " on row " + matchingRow.getRow() + " from " + currentSection + " to " + destinationSection +"\n"
+    var result = "Moved " + targetQty + currentUnit + " of " + targetDescription +  
+    " on row " + matchingRow.getRow() + " from " + currentSection + " to " + destinationSection +"\n"
     editedMaterials.push(result);
+ }
+ // check whether a result was found
+ if (editedMaterials.length > 0){
+    outputCell.setValue(editedMaterials);
+    outputCell.setBackground("mediumspringgreen");
 
  }
+ else{
+   outputCell.setValue(possibleErrors);
+   outputCell.setBackground("crimson");
+ }
 }
+
 /*
 trying to brainstorm a better way than searching whole sheet because thattt is a long process
 */
 function relocatePallet(sourceRowNum){
-  
   // scan Relocator and store source and destination section
   var sourceRow = inputSheet.getRange(sourceRowNum, SRC_SECTION+1, 1, OUTPUT+1);
   var outputCell = sourceRow.getCell(1, OUTPUT+1);
@@ -186,7 +208,6 @@ function relocatePallet(sourceRowNum){
       var result = currentDesc + " on Row " + currentRowNum;
       editedMaterials.push(result);
     }
-
   }
   outputCell.setValue("Moved " + editedMaterials.length + " items: " + editedMaterials.toString());
 }
