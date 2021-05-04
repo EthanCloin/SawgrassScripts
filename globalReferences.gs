@@ -34,3 +34,17 @@ var inventoryInputLastRow = inventoryInputSheet.getLastRow();
 var inventoryInputLastCol = inventoryInputSheet.getLastColumn();
 var lastRelocatorRow = relocatorSheet.getLastRow();
 var lastRelocatorCol = relocatorSheet.getLastColumn();
+
+/*
+creates menu
+*/
+function onOpen() {
+  ui.createMenu("InventoryAssistant")
+    .addSubMenu(ui.createMenu("LedgeringAssistant")
+    .addItem("Allocate Materials by SKU", "ledgerItemsWithSKU")
+    .addItem("Reconcile Materials by Lot", "ledgerItemsWithLot")
+    .addItem("Undo Allocation", "removeAllocation"))
+    .addSeparator()
+    .addItem("Relocator", "determineRelocationType")
+    .addToUi(); 
+}
