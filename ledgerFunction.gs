@@ -1,6 +1,6 @@
 /*
 @author Ethan Cloin
-@version 2021-03-12
+@version 2021-05-04 NEED TO UPDATE USAGE ETC
 
 Contents:
   ledgerItemsWithLot()
@@ -8,7 +8,7 @@ Contents:
   onOpen()
   resetInputSheet()
 
-Usage:
+Usage: needs updated...below is from version 2021-03-12
   This set of functions is designed specifically for use with SNL Master Inventory as it currently
   exists within GSuite. The functions efficiently perform inventory actions that previously required extensive user 
   interaction with the spreadsheet. 
@@ -39,7 +39,7 @@ Usage:
 
 /*
 @author Ethan Cloin
-@version 2021-02-15
+@version 2021-05-04
 
 This script scans the contents of inventory sheet "Ledger" until it locates a targeted row. 
 The target row is one which matches a lot number AND description in the input sheet "inputTable". 
@@ -127,7 +127,7 @@ function ledgerItemsWithLot(){
 
 /*
 @author Ethan Cloin
-@version 2021-03-12
+@version 2021-05-04
 
 This script scans the contents of inventory sheet "Ledger" until it locates a targeted row. 
 The target row is one which matches a description in the input sheet "inputTable". 

@@ -1,4 +1,6 @@
 /*
+@author Ethan Cloin
+@version 2021-05-04 -- NEED TO UPDATE USAGE ETC
 Goal of the function:
 
 Allow the user to update the location of materials in a few ways:
@@ -17,14 +19,23 @@ Allow the user to update the location of materials in a few ways:
 */
 
 /*
+@author Ethan Cloin
+@version 2021-05-04
 
+This function will find all entries of the given material (lot+description) and
+update the section value to the provided destination. 
+
+@input Material Description, Material Lot, Destination Section
+@output edited section value on the appropriate rows in Ledger sheet. Also string 
+        output to a cell in Relocator sheet detailing the edited materials and row numbers
 */
 function relocateFullQty(sourceRowNum) {
   if (!validInputDataForFull(sourceRowNum)){
     relocatorSheet.getRange(sourceRowNum, 1, 1, lastRelocatorCol).setBackground("gray");
+    Logger.log("invalid");
     return;
   }
-
+  
   // scan Relocator and store description, lot, source, and destination section
   var sourceRow = relocatorSheet.getRange(sourceRowNum, SRC_SECTION+1, 1, OUTPUT+1);
   var outputCell = sourceRow.getCell(1, OUTPUT+1);
@@ -38,11 +49,11 @@ function relocateFullQty(sourceRowNum) {
   // search Ledger for matching lot
   var finder =  ledgerSheet.getRange(2, LOT_I+1, lastLedgerRow, 1)
                 .createTextFinder(targetLot)
-                .matchEntireCell(true)
-                
+                .matchEntireCell(true);
+  Logger.log("searching for " + targetLot.toString());
   var matchingLotsRange = finder.findAll();
   var foundCount = matchingLotsRange.length;
-
+  Logger.log("found " + foundCount);
   for (var i = 0; i < foundCount; i++){
     // get the whole row
     var currentCell = matchingLotsRange[i];
@@ -67,11 +78,26 @@ function relocateFullQty(sourceRowNum) {
     var result = "Moved from " + currentSection.toString() + " to " + destinationSection.toString() + " on row " + matchingRow.getRow() + "\n";
     editedMaterials.push(result);
   }
+
+  if (editedMaterials.toString().length === 0){
+  outputCell.setBackground('crimson');
+  }else{
   outputCell.setValue(editedMaterials.toString());
+  outputCell.setBackground('mediumspringgreen');
+  }
 }
 
 /*
-need to run tests
+@author Ethan Cloin
+@version 2021-05-04
+
+This function will find the initial entry of the given material (lot+description).
+Using the provided
+
+@input  Material Description, Material Lot, Target Quantity, Destination Section
+@output New ledger entry with the destination section and target quantity
+        Edit to original ledger entry to remove the quantity that was relocated
+        Text in outputCell detailing the rows changed
 */
 function relocatePartialQty(sourceRowNum){
   if (!validInputDataForPartial(sourceRowNum)){
@@ -84,6 +110,12 @@ function relocatePartialQty(sourceRowNum){
   var targetDescription = sourceRow.getCell(1, TARGET_DESC + 1).getValue();
   var targetLot = sourceRow.getCell(1, TARGET_LOT + 1).getValue();
   var sourceSection = sourceRow.getCell(1, SRC_SECTION + 1).getValue();
+  
+  // see whether we need to check for a matching source section
+  var hasSection = true;
+  if (sourceSection.toString().length === 0 ){
+    hasSection = false;
+  }
   var destinationSection = sourceRow.getCell(1, DEST_SECTION + 1).getValue();
   var targetQty = Math.abs(sourceRow.getCell(1, TARGET_QTY+1).getValue());
   var editedMaterials = [];
@@ -109,13 +141,15 @@ function relocatePartialQty(sourceRowNum){
       }
 
     // check section
+    if (hasSection){
     var sectionCell = matchingRow.getCell(1, SECTION_I+1);
     var currentSection = sectionCell.getValue();
     if (sourceSection != "" && currentSection != sourceSection){
       possibleErrors.push("wrong section on row " + matchingRow.getRow());
       continue;
       }
-    var prevSection = currentSection;
+    }
+    // var prevSection = currentSection;
 
     // check that qty > qty to remove
     var currentQty = matchingRow.getCell(1, QTY_I+1).getValue();
@@ -147,16 +181,26 @@ function relocatePartialQty(sourceRowNum){
  if (editedMaterials.length > 0){
     outputCell.setValue(editedMaterials);
     outputCell.setBackground("mediumspringgreen");
+    return;
 
  }
  else{
    outputCell.setValue(possibleErrors);
    outputCell.setBackground("crimson");
+   return;
  }
 }
 
 /*
-trying to brainstorm a better way than searching whole sheet because thattt is a long process
+@author Ethan Cloin
+@version 2021-05-04
+
+This function will find all entries in the given source section and
+update the section value to the provided destination section. 
+
+@input Source Section, Destination Section
+@output edited section value on the appropriate rows in Ledger sheet. Also string 
+        output to a cell in Relocator sheet detailing the edited materials and row numbers
 */
 function relocatePallet(sourceRowNum){
   // scan Relocator and store source and destination section
@@ -197,6 +241,7 @@ function relocatePallet(sourceRowNum){
     }
   }
   outputCell.setValue("Moved " + editedMaterials.length + " items: " + editedMaterials.toString());
+  outputCell.setBackground('mediumspringgreen');
 }
 
 /*
@@ -273,9 +318,15 @@ function validInputDataForPartial(sourceRowNum) {
   var values = sourceRow.getValues();
   var result = [];
 
-  if (values[0][SRC_SECTION] === "")  {
-      result.push("Missing Source! ");
+  if (values[0][SRC_SECTION] === ""){
+    // prompt whether user is okay with changing values regardless of source section
+    var response = ui.alert('The source section is blank! Do you wish to proceed anyway?', ui.ButtonSet.YES_NO);
+    if (response == ui.Button.YES ){
+      //continue
+    }else if (response == ui.Button.NO){
+      return false;
     }
+  }
   if (values[0][DEST_SECTION] === "")  {
     result.push("Missing Destination! ");
   }
@@ -305,17 +356,18 @@ function validInputDataForPallet(sourceRowNum) {
   var values = sourceRow.getValues();
   var result = [];
 
-  if (values[0][SRC_SECTION] === "")  {
-    // prompt whether user is okay with changing values regardless of source section
-    var response = ui.alert('The source section is blank! Are you sure you want to move this material without considering current location?', ui.ButtonSet.YES_NO);
-    if (response == ui.Button.YES ){
-      //continue
-    }else if (response == ui.Button.NO){
-      return false;
-    }
-    }
+  if (values[0][SRC_SECTION] === "")  {return false;}
   if (values[0][DEST_SECTION] === "")  {
     result.push("Missing Destination! ");
+  }
+  if (values[0][TARGET_DESC] != ""){
+    results.push("No description necessary for full pallet swap!")
+  }
+  if (values[0][TARGET_LOT] != ""){
+    results.push("No lot necessary for full pallet swap!")
+  }
+  if (values[0][TARGET_QTY] != ""){
+    results.push("No qty necessary for full pallet swap!")
   }
  
   if (result.length != 0){
