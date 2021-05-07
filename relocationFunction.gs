@@ -53,6 +53,13 @@ function relocateFullQty(sourceRowNum) {
   Logger.log("searching for " + targetLot.toString());
   var matchingLotsRange = finder.findAll();
   var foundCount = matchingLotsRange.length;
+  var possibleErrors = [];
+  // notify if no lots found
+  if (foundCount === 0){
+    outputCell.setValue("Didn't find this lot! Copy/Paste value from Stock Check to avoid typos.");
+    outputCell.setBackground("crimson");
+    return;
+  }
   Logger.log("found " + foundCount);
   for (var i = 0; i < foundCount; i++){
     // get the whole row
@@ -65,22 +72,33 @@ function relocateFullQty(sourceRowNum) {
 
     // check row for matching desc
     var currentDesc = matchingRow.getCell(1, DESC_I+1).getValue();
-    if (currentDesc != targetDescription){continue;}
+    if (currentDesc != targetDescription){
+      possibleErrors.push("Description doesn't match this lot!");
+      continue;
+      }
 
     // check row for matching source
     var sectionCell = matchingRow.getCell(1, SECTION_I+1);
     var currentSection = sectionCell.getValue();
-    if (sourceSection != "" && currentSection != sourceSection){continue;}
+    if (sourceSection != "" && currentSection != sourceSection){
+      possibleErrors.push("Source Section doesn't match!");
+      continue;
+      }
 
     // update Section value
     sectionCell.setValue(destinationSection);
 
-    var result = "Moved from " + currentSection.toString() + " to " + destinationSection.toString() + " on row " + matchingRow.getRow() + "\n";
+    // grab qty for output message
+    var qtyMoved = matchingRow.getCell(1, QTY_I+1);
+
+    var result = "Moved " + qtyMoved.toString() + " from " + currentSection.toString() + " to " + 
+                  destinationSection.toString() + " on row " + matchingRow.getRow() + "\n";
     editedMaterials.push(result);
   }
 
   if (editedMaterials.toString().length === 0){
   outputCell.setBackground('crimson');
+  outputCell.setValue(possibleErrors.toString());
   }else{
   outputCell.setValue(editedMaterials.toString());
   outputCell.setBackground('mediumspringgreen');
@@ -209,6 +227,8 @@ function relocatePallet(sourceRowNum){
   var sourceSection = sourceRow.getCell(1, SRC_SECTION + 1);
   var destinationSection = sourceRow.getCell(1, DEST_SECTION + 1);
   var editedMaterials = [];
+  var possibleErrors = [];
+  
   // data validation
   if (!validInputDataForPallet(sourceRowNum)){
     relocatorSheet.getRange(sourceRowNum, 1, 1, lastRelocatorCol).setBackground("gray");
