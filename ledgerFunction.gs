@@ -1,40 +1,50 @@
 /*
 @author Ethan Cloin
-@version 2021-05-04 NEED TO UPDATE USAGE ETC
+@version 2021-06-09
 
 Contents:
-  ledgerItemsWithLot()
-  ledgerItemsWithSKU()
-  onOpen()
-  resetInputSheet()
+  ledgerItemsWithLot()  ** Available for use via Toolbar
+  removeAllocation()    ** Available for use via Toolbar
+  ledgerItemsWithSKU()  ** Available for use via Toolbar
+  resetInputSheet()     ** not in use
+  validInputSheet()     ** helper function
+  promptForInput()      ** helper function
+  confirmWithUser()     ** helper function
+  
 
-Usage: needs updated...below is from version 2021-03-12
-  This set of functions is designed specifically for use with SNL Master Inventory as it currently
+Usage:
+  **This set of functions is designed specifically for use with SNL Master Inventory as it currently
   exists within GSuite. The functions efficiently perform inventory actions that previously required extensive user 
   interaction with the spreadsheet. 
+  
+  --ledgerItemsWithSKU--
+  This function performs allocation on the main Ledger sheet as dictated by the contents of
+  LedgeringAssistant sheet. Fill the inputTable with a list of materials that need to be allocated. Include 
+  Description, Quantity, JobNumber, and Comments. Leave the lot number column blank. 
+  
+  Select "Allocate Materials by SKU" from the Inventory Assistant dropdown menu and wait for the script to execute. 
+  Manual adjustment may be required based on the error messages returned by the function. 
+  
+  The purpose of this function is to adjust the Ledger such that materials allocated for a job are considered unavailable
+  in inventory, before any lot numbers are assigned to the materials in that job. This way, the purchasing team can see an
+  updated Stock Check right away, before materials are even received. 
+  
+  --removeAllocation--
+  This function removes entries made by ledgerItemsWithSKU. Provide the job number you wish to remove an allocation
+  for, and after it is removed, proceed with ledgering by lot. 
+  
+  
+  --ledgerItemsWithLot--
+  This function performs ledgering on the main Ledger sheet as dictated by the contents of the LedgeringAssistant sheet. 
+  Fill the LedgeringAssistant with a list of materials that need to be ledgered along with quantity and job number, select 
+  "Ledger Materials by Lot" from the Ledgering Assistant dropdown menu, and wait for the script to execute. Manual adjustment 
+  may be required based on the error messages returned by the function.
+  
+  The purpose of this function is to adjust the Ledger such that materials consumed by production are removed to reflect current stock.
+  The function should be run after any allocation to the specific job is removed, and production has provided the accurate
+  count of materials consumed by that job.
+  
 
-  The function "ledgerItemsWithSKU" performs allocation on the main Ledger sheet as defined by the contents of
-  inputTable sheet. Fill the inputTable with a list of materials that need to be allocated along with quantity,
-  jobNumber, and comments. Leave the lot number column blank. Select "Allocate Materials by SKU" from the Ledgering
-  dropdown menu and wait for the script to execute. Manual adjustment may be required based on the error messages 
-  returned by the function. 
-  The intended purpose of this function is to adjust the Ledger such that materials allocated for a job appear in a seperate 
-  section in the Stock Check pivot table from those materials already consumed. This will allow purchasing team to be aware
-  of what materials are in stock, and what needs to be sourced to fulfill a job. 
-
-  The function "ledgerItemsWithLot" performs ledgering on the main Ledger sheet as defined by the contents of 
-  inputTable sheet. Fill the inputTable with a list of materials that need to be ledgered along with quantity
-  and job number, select "Ledger Materials by Lot" from the Ledgering dropdown menu, and wait for the script to 
-  execute. Manual adjustment may be required based on the error messages returned by the function.
-  The intended purpose of this function is to adjust the Ledger such that materials consumed by production are allocated
-  and removed to reflect current stock. 
-  To ensure that StockCheck is accurate, users will have to manually remove any entries made with prior use of the "ledgerItemsWithSKU" 
-  function. This way, the reconciled usage by lot replaces the allocation instead of double-ledgering materials
-
-  The function "onOpen" runs upon opening Master Inventory and creates the "Ledgering" dropdown menu. This menu is how users
-  interface with the functions defined within this file. 
-
-  The function "resetInputSheet" clears the contents of inputSheet
 */
 
 /*
@@ -168,10 +178,28 @@ function ledgerItemsWithSKU(){
     var finder = ledgerSheet.getRange(2, DESC_I+1, lastLedgerRow, 1).createTextFinder(currentInputDesc).matchEntireCell(true);
     var matchingDesc = finder.findNext();
     Logger.log(matchingDesc);
-    // check for no lot found
+    // check for no desc found
     if (matchingDesc === null){
-          errorRowNumbers.push(row);
+      // create a new ledger entry
+      // this is for ingredients that are ordered but not received at time of ledgering
+      if(confirmWithUser("No matching descriptions " + currentInputDesc + " found in the Ledger!\nDo you want to make an allocation against this SKU anyway?\nNote that you will have to fill some data fields in manually. Row will be highlighted purple to remind you.")){
+      ledgerSheet.insertRowAfter(ledgerSheet.getLastRow());
+      var newLedgerEntry = ledgerSheet.getRange(ledgerSheet.getLastRow(), 1, 1, ledgerSheet.getLastColumn()); 
+      // update fields of new entry per input sheet
+      newLedgerEntry.getCell(1, DATE_I+1).setValue(new Date());
+      newLedgerEntry.getCell(1, DESC_I+1).setValue(currentInputDesc);
+      newLedgerEntry.getCell(1, QTY_I+1).setValue(currentInputQty);
+      newLedgerEntry.getCell(1, POJOB_I+1).setValue(currentInputJob);
+      newLedgerEntry.getCell(1, COMMENT_I+1).setValue(currentInputComment);
+      newLedgerEntry.getCell(1, CHECK_I+1).check();
+      newLedgerEntry.getCell(1, LOT_I+1).setValue("");
+      currentInputRow.setBackground('lavender');
           continue;
+      }
+      else {
+        errorRowNumbers.push(row);
+        continue;
+      }
     }
 
     // get row containing matchingDesc
@@ -188,6 +216,7 @@ function ledgerItemsWithSKU(){
     newLedgerEntry.getCell(1, COMMENT_I+1).setValue(currentInputComment);
     newLedgerEntry.getCell(1, CHECK_I+1).check();
     newLedgerEntry.getCell(1, LOT_I+1).setValue("");
+    currentInputRow.setBackground("mediumspringgreen");
   }
   highlightMissedRows(errorRowNumbers);
 }
@@ -239,7 +268,7 @@ function highlightMissedRows(errorRowNumbers){
       missingAny = true;
       continue;
     }
-    assistantSheet.getRange(row, 1, 1, lastAssistantCol).setBackground("mediumspringgreen");
+    //assistantSheet.getRange(row, 1, 1, lastAssistantCol).setBackground("mediumspringgreen");
   }
 
   if (missingAny){
@@ -262,7 +291,14 @@ function removeAllocation(){
     // find all rows that contain the given batch lot
     var finder = ledgerSheet.createTextFinder(batchLotNumber).matchEntireCell(true);
     var matches = finder.findAll();
+    
+    
     var numMatches = matches.length;
+    // check for no matches
+    if (numMatches === 0) {
+      ui.alert("No matches found for lot " +batchLotNumber.toString());
+      return;
+    }
     var errorRowNumbers = [];
     var rowsDeleted = 0;
     
@@ -284,7 +320,7 @@ function removeAllocation(){
       ui.alert("Removed " + rowsDeleted + " entries without error.")
     }
     else {
-      ui.alert("Removed " + rowsDeleted + " entries. Encountered problems on rows: " + errorRowNumbers.toString());
+      ui.alert("Removed " + rowsDeleted + " entries. Found entries ledgered by lot on rows: " + errorRowNumbers.toString());
     }
 }
 
@@ -298,4 +334,18 @@ function promptForInput(messageToUser){
     return response.getResponseText();
   }
 
+}
+
+// helper function to pop up a yes/no menu 
+function confirmWithUser(message){
+  //prompt user for approval
+    var response = ui.alert(message, ui.ButtonSet.YES_NO);
+
+    if (response == ui.Button.YES ){
+      return true;
+    }
+    else if (response == ui.Button.NO){
+      return false;
+    }
+    return false;
 }
